@@ -1,0 +1,699 @@
+---
+title: "DataFest-workshop2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(nycflights13)
+library(babynames)
+```
+
+##  dplyr package: data manipulation
+
+*split-apply-combine*: A common analytical pattern is to split data frame into pieces, apply some function to each pieces, and combine the results back together again to a new data frame. 
+
+It provides simple *verbs*, functions that correspond to the most common data manipulation tasks, to help you translate your thoughts into code.
+
+*dplyr* aims to provide a function for each basic verb of data manipulation:
+
+group_by() to split the data frame into pieces based on some variables.
+filter() to select cases based on their values.
+arrange() to give cases/observations a specific order
+select() to select variables based on their names.
+mutate() to add new variables that are functions of existing variables.
+summarise() to condense multiple values to a single value.
+
+All verbs work similarly:
+1. The first argument is a data frame;
+2. The subsequent arguments describe what to do with the data frame, using the variable names (without quotes);
+3. The result is a new data frame;
+
+### Import dataset
+
+```{r}
+summary(gss_cat)
+```
+
+
+### filter()
+filter() to select cases/observations/rows based on their values.
+```{r}
+
+# Select all the respondents in 2000
+filter(gss_cat, year==2000)
+
+
+data1<-filter(gss_cat, year==2000, marital=="Married")
+
+```
+dplyr executes the filtering operator and return a new data frame, you can save the new data frame to an object.
+
+
+
+### arrange()
+Reorder the observations by their values of a variable
+
+```{r}
+# arrange(dataset, variable)
+arrange(gss_cat, age) # ascending order is default
+
+arrange(gss_cat, desc(age)) # descending order
+```
+
+
+*filter() and arrange() work on **observations/rows** *
+
+
+
+### select()
+select() to select variables based on their names.
+
+```{r}
+select(gss_cat, year, age, rincome, race, tvhours)
+
+# save it to an object
+
+data2<-select(gss_cat, year, age, rincome, race, tvhours)
+
+
+```
+
+
+### mutate()
+create new columns that are functions of existing columns and add them to the original dataset as a new dataset. 
+```{r}
+mutate(data2, avg = tvhours / age) # keep all variables including the new one
+
+transmute(data2, avg = tvhours/age) # only keep new variable
+
+```
+
+*select() and mutate() work on **varaibles/columns** *
+
+###  Grouped summaries with summarise()
+summarise() to get summaries from multiple values.
+```{r}
+summarise(gss_cat, avg=mean(age, na.rm = T))
+
+summarise(gss_cat, avgincome=mean(tvhours, na.rm=T))
+
+mean(gss_cat$tvhours, na.rm=T)
+```
+
+
+### Pipe operator: *%>%* (*then*)
+Pipes take the output from one function and feed it to the first argument of the next function.
+Instead of nesting functions (reading from the inside to the outside), the idea of of piping is to read the functions from left to right.
+
+```{r}
+data3<-gss_cat %>%
+  select(year, rincome, age, tvhours) %>%
+  filter(year==2000, rincome=="$25000 or more") %>%
+  mutate(avg= tvhours / age) %>%
+  arrange(avg)
+```
+
+
+
+### Pair summarise with group_by(). 
+group_by() to split the data frame into pieces based on some variables. 
+*split-apply-combine*: split data frame into groups, apply some function to each group, and combine the results back together again to a new data frame. 
+```{r}
+gss_cat %>%
+  group_by(year) %>%
+  summarise(avg=mean(tvhours, na.rm=T)) #%>%
+#ggplot(aes(x=year, y=avg)) +  geom_line()
+
+```
+
+
+Exercise 1: Get a scatterplot of average age at each year!
+
+```{r}
+
+```
+
+
+
+
+Exercise 2: For the *gss_cat* data, get a new dataset *ex1* of the percent of married respondents and average age of respondents by year. Get a plot to visualize the relation between age and marital status by year.
+
+
+```{r}
+  
+```
+
+
+Exercise 3: What is the party with the highest/lowest watch tvhours? - does it change over the years?
+```{r}
+
+gss_cat %>% 
+  group_by(year, partyid) %>%
+  summarise(avgtv = mean(tvhours, na.rm=T)) %>%
+  summarise( richest= partyid[which.max(avgtv)], poorest=partyid[which.min(avgtv)])
+
+```
+
+## forcats
+
+This package provides some tools for working with categorical variables (factors)
+
+Question 1: find the relation between religions and average hours of watching tv.
+
+```{r}
+gss_cat
+
+relig_summary <- gss_cat %>%
+  group_by(relig) %>%
+  summarise(tvhours=mean(tvhours,na.rm = T)) 
+
+  ggplot(relig_summary,aes(x=tvhours, y=relig)) +
+  geom_point()
+```
+
+How could we interpret the plot without overall pattern? 
+
+
+### fct_reorder()
+
+Reordering the levels of a factor using *fct_reorder()*.
+
+*fct_reorder()* takes three arguments:
+
+- f, the factor whose levels you want to modify.
+
+- x, a numeric vector that you want to use to reorder the levels.
+
+- Optionally, fun, a function used if there are multiple values of x for each value of f. The default value is median.
+
+```{r}
+ggplot(relig_summary, aes(x=tvhours, y=fct_reorder(relig, tvhours))) +
+  geom_point()
+
+```
+
+
+
+
+### *fct_infreq()*
+
+You can use fct_infreq() to order levels in increasing frequency: this is the simplest type of reordering because it does not need any extra variables. 
+
+```{r}
+
+gss_cat %>%
+  ggplot(aes(marital)) +
+    geom_bar()
+
+gss_cat %>%
+  mutate(marital = fct_infreq(marital)) %>%
+  ggplot(aes(marital)) +
+    geom_bar()
+
+
+```
+
+### fct_recode
+
+
+```{r}
+levels(gss_cat$partyidnew)
+gss_cat %>%
+drop_na(tvhours) %>%
+mutate(partyidnew = fct_recode(partyid,
+    "Republican, strong"    = "Strong republican",
+    "Republican, weak"      = "Not str republican",
+    "Independent, near rep" = "Ind,near rep",
+    "Independent, near dem" = "Ind,near dem",
+    "Democrat, weak"        = "Not str democrat",
+    "Democrat, strong"      = "Strong democrat",
+    "Other"                 = "No answer",
+    "Other"                 = "Don't know",
+    "Other"                 = "Other party")) %>%      
+group_by(partyidnew) %>%
+summarise(meantvhours = mean(tvhours)) %>%
+ggplot(aes(x=meantvhours, y=fct_reorder(partyidnew,meantvhours))) +
+geom_point()
+
+```
+
+### fct_collapse()
+
+If you want to collapse a lot of levels, fct_collapse() is a useful variant of fct_recode(). For each new variable, you can provide a vector of old levels:
+
+```{r}
+gss_cat %>%
+  mutate(partyidnew = fct_collapse(partyid,
+    other = c("No answer", "Don't know", "Other party"),
+    rep = c("Strong republican", "Not str republican"),
+    ind = c("Ind,near rep", "Independent", "Ind,near dem"),
+    dem = c("Not str democrat", "Strong democrat")
+  )) %>%
+  count(partyidnew)
+```
+
+
+### fct_lump()
+
+Sometimes you just want to lump together all the small groups to make a plot or table simpler. That is the job of fct_lump()
+```{r}
+gss_cat %>%
+  mutate(relignew = fct_lump(relig)) %>%  # the largest one and the rest 
+  count(relignew)
+```
+
+
+but we have probably over collapsed:
+
+
+```{r}
+gss_cat %>%
+  mutate(relig = fct_lump(relig, n=5)) %>%
+  count(relig)
+```
+
+
+
+## Joining relational datasets
+
+```{r}
+
+# Toy datasets to use
+
+
+band <- tribble(
+   ~name,     ~band,
+  "Mick",  "Stones",
+  "John", "Beatles",
+  "Paul", "Beatles"
+)
+
+instrument <- tribble(
+    ~name,   ~plays,
+   "John", "guitar",
+   "Paul",   "bass",
+  "Keith", "guitar"
+)
+
+instrument2 <- tribble(
+    ~artist,   ~plays,
+   "John", "guitar",
+   "Paul",   "bass",
+  "Keith", "guitar"
+)
+```
+
+### Mutating joins
+
+#### 1.  *left_join(x, y, by="key variable")*: keeps all the observations (rows) in x
+
+A key is a variable that uniquely identifies an observation, otherwise, we need multiple variables to identify an observation,
+
+```{r}
+## left_join(x, y, by="key variable")  
+## join y to x, x is the primary dataset
+## mutate new variables in x by copying different variables in y
+## return a new dataset
+
+## left_join(x, y, by=c("key variable1", "key variable2"))
+
+dat1<-left_join(band, instrument, by="name")
+dat1
+```
+
+#### 2. *right_join(x, y, by="")*: keep all the observations (rows) in y
+
+The opposite way of *left_join()*
+
+```{r}
+band
+instrument
+dat2<-right_join(band,instrument, by="name")
+dat2
+```
+
+
+
+#### 3. *inner_join()* keeps all the observations in **both** x and y
+
+An inner join keeps observations that appear in both tables. But unmatched rows are not included in the result, it is easy to lose observatoins.   
+
+```{r}
+inner_join(band, instrument, by="name")
+```
+
+
+#### 4. *full join* keeps all observations in x and y
+
+An full join keeps observations that appear in either x or y.
+
+```{r}
+full_join(band, instrument, by="name")
+```
+
+
+### Filtering joins
+
+#### 1. *semi_join(x,y, by="")* keeps all the observations of x that have a match in y
+
+
+use semi_join() to collect the artists in *band* that have instrument info in *instrument*.
+```{r}
+semi_join(band, instrument, by="name")
+
+## use semi_join() to collect the artists in *band* that have instrument info in *instrument*.
+```
+
+
+
+#### 2. *anti_join(x,y, by="")* drops all the observations of x that have a match in y.  
+
+```{r}
+anti_join(band, instrument, by="name")
+
+## Use an anti_join() to return the rows of artists for which you don't have any instrument info.
+```
+
+
+
+#### Example: join relational datasets connected by key variables 
+
+```{r,eval=FALSE}
+# check out the package "nycflights13"
+
+flights # connects to 
+planes # via a single variable *tailnum*
+
+flights # connects to 
+airlines # through the *carrier* variable 
+
+flights # connects to 
+airports # via two variables *faa* and *dest*
+
+flights # connects to 
+weather # via *origin*, *year*, *month*, *day*, and *hour*
+
+```
+
+
+```{r}
+planes %>%
+  group_by(tailnum) %>%
+  summarise(total=n()) 
+
+# is equivalent to 
+
+planes %>%
+  count(tailnum) %>%
+  filter(n>1)
+
+##n() is to calculate the number of occurrences of each observation
+
+# count() is to calculate the number of occurrences of each observation, the same as the below group_by()+summarise(n())
+
+
+flights %>%
+  count(year, month, day, flight, sort=T) %>%
+  filter(n>1)
+```
+
+ 
+
+Example 1:
+
+```{r,eval=TRUE}
+
+# match  variable dest in the flights to faa in the airport, output is the dest
+
+flights %>%
+ semi_join(airports, by=c("dest"="faa")) %>%
+summarise(total=n_distinct(dest))
+
+```
+
+Example 2:
+
+Join airports to flights and get how many flights in flights flew to an airport not listed in airports?
+(Hint: use n distinct() function to count.)
+
+```{r}
+flights %>% 
+anti_join(airports, by=c("dest"="faa")) %>% 
+  summarise(total=n_distinct(dest))
+
+```
+
+## lubridate
+
+The **lubridate** package makes it easier to work with dates and times in R.
+
+```{r}
+today()  # date
+
+now()     # date-time
+```
+
+There are usually two ways you are likely to create a date/time:
+
+- From a string:
+
+use the lubridate function to parse your date
+```{r}
+ymd("2017-01-31")
+
+mdy("January 31st, 2017")
+
+dmy("31-Jan-2017")
+
+ymd_hms("2017-01-31 20:11:59")
+```
+
+- From individual components
+
+use *make_date()* for dates, or *make_datetime()* for date-times:
+
+```{r}
+flights %>% 
+  select(year, month, day, hour, minute) %>% 
+  mutate(departure_sched = make_datetime(year, month, day, hour, minute))
+```
+
+
+```{r}
+# fix the dep_time and arr_time in the flights dataset
+
+make_datetime_100 <- function(year, month, day, time) {
+  make_datetime(year, month, day, time %/% 100, time %% 100)
+}
+
+flights_dt <- flights %>% 
+  filter(!is.na(dep_time), !is.na(arr_time)) %>% 
+  mutate(
+    dep_time = make_datetime_100(year, month, day, dep_time),
+    arr_time = make_datetime_100(year, month, day, arr_time),
+    sched_dep_time = make_datetime_100(year, month, day, sched_dep_time),
+    sched_arr_time = make_datetime_100(year, month, day, sched_arr_time)
+  ) %>% 
+  select(origin, dest, ends_with("delay"), ends_with("time"))
+```
+
+With this data, we can visualise the distribution of departure times across the year:
+
+```{r}
+flights_dt %>% 
+  ggplot(aes(dep_time)) + 
+  geom_freqpoly(binwidth = 86400) # 86400 seconds = 1 day
+```
+
+Or visualise the distribution of departure times within a single day:
+
+```{r}
+flights_dt %>% 
+  filter(sched_dep_time < ymd_hms("2013-01-02 00:00:00")) %>% 
+  ggplot(aes(sched_dep_time)) + 
+  geom_freqpoly(binwidth = 600) # 600 s = 10 minutes
+```
+
+- Date-time components:
+
+pull out individual parts of the date with the accessor functions:
+
+```{r}
+datetime <- ymd_hms("2016-07-08 12:34:56")
+
+year(datetime)  
+
+month(datetime)   
+
+month(datetime, label = TRUE)  # return the abbreviated name of the month or weekday
+
+
+mday(datetime)   # day of the month
+
+yday(datetime)   # day of the year
+
+wday(datetime, label = TRUE, abbr = FALSE)   # day of the week
+
+minute(datetime)
+second(datetime)
+```
+
+
+use *wday()* to see the distribution of flights depart everyday of a week
+
+
+```{r}
+flights_dt %>% 
+  mutate(wday = wday(sched_dep_time, label = TRUE)) %>% 
+  ggplot(aes(x = wday)) +
+    geom_bar()
+```
+
+## tidy up datasets
+
+The *tidyr* package helps tidy up messy datasets. 
+
+There are three interrelated rules which make a dataset tidy:
+
+- Each variable must have its own column
+
+- Each observation must have its own row
+
+- Each value must have its own cell
+
+There are a few key functions in the *tidyr* package, *gather()*, *spread()*, *separate()*, *unite()*.
+
+
+```{r,echo=FALSE}
+# toy datasets
+
+# population table
+table1<-tibble(
+  `country`=c("Afghanistan","Brazil","China"),
+  `1999`=c(19987071, 172006362, 1272915272),
+  `2000`=c(20595360, 174504898, 1280428583)
+)
+table1
+```
+
+```{r, echo=FALSE}
+# case table
+table2<-tibble(
+    `country` = c("Afghanistan","Brazil","China"),
+  `1999` = c(745, 37737, 212258),
+  `2000` = c(2666, 80488, 213766)
+)
+table2
+```
+
+
+### gather()
+To tidy  a dataset, we need to *gather* multiple columns, and gathers them into key-value pairs: it makes "wide" data longer.
+```{r}
+#function template
+# gather(dataset, a set of columns, 
+#         key="the name of variable whose values form the column names", 
+#         value="the name of variable whose values are spread over the cells")
+```
+
+
+Example 1:
+```{r}
+newtable1<-table1 %>%
+  gather(`1999`,`2000`, key="year", value="population")
+newtable1
+```
+
+```{r}
+```
+
+Example 2:
+```{r}
+gather(table2, "1999":"2000", key=year, value = cases)
+
+newtable2 <- table2 %>%
+  gather(`1999`,`2000`, key= year, value= cases)
+newtable2
+```
+
+
+Join the tables:
+```{r}
+table<- left_join(newtable1, newtable2) 
+table
+```
+
+
+### spread()
+*spread()* is the opposite of *gather()*. *gather()* makes wide tables narrower and longer, *spread()* makes long tables shorter and wider.
+```{r, echo=FALSE}
+#template
+#spread(data, 
+#       key="the column that contains variable name", 
+#       value="the column that contains values forms multiple variables")
+```
+
+
+```{r}
+table3<- tibble(
+  `country` = c("Afghanistan", "Afghanistan", "Afghanistan", "Afghanistan", "Brazil", "Brazil", "Brazil", "Brazil","China", "China","China", "China"),
+   `year` = c(1999,1999,2000,2000,1999,1999,2000,2000,1999,1999,2000,2000),
+   `type` = c("case", "population","case", "population","case", "population","case", "population","case", "population","case", "population"),
+   `count` = c(745, 19987071, 2666, 20595360, 37737, 172006362, 80488, 174504898, 212258, 1272915272, 213766, 1280428583)
+)
+table3
+```
+
+Example 1:
+```{r}
+#template
+#spread(data, 
+#       key="the column that contains variable name", 
+#       value="the column that contains values forms multiple variables")
+table5<-spread(table3, key= "type", value= "count") 
+table5
+```
+
+
+### Separate and Unite 
+*separate()* pulls apart one column into multiple columns, *unite()* is the inverse of *separate()*.
+```{r, echo=FALSE}
+table4<-tibble(
+    `country` = c("Afghanistan", "Afghanistan", "Brazil", "Brazil","China", "China"),
+     `year` = c(1999,2000,1999,2000,1999,2000),
+    `rate`= c("745/19987071", "2666 / 20595360", "37737 / 172006362", "80488 / 174504898", "212258/1272915272", "213766/1280428583")
+)
+table4
+```
+
+
+Example 1:
+
+```{r}
+separate(table4, rate, into=c('case','population'), sep="/")
+
+table4 %>%
+separate(rate, into = c("case", "population"), sep="/")
+
+table  %>%
+separate(year, into = c("century", "year"), sep=2) # seperate by position
+```
+
+
+Example 2:
+
+```{r}
+flights %>%
+  separate(time_hour, into = c("date1", "hour1"), sep=-9) # from right-most
+
+unite(flights, date, year,month, day)
+
+```
+
+
+
+
+
