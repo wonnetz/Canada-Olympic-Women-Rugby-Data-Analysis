@@ -1,0 +1,58 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(rio)
+rpe <- read.csv(file="/home/wonnetz/Documents/DataFest2019/Data/DATA2019 copy/data for datafest 2019/rpe.csv", header=TRUE, sep=",")
+wellness <- read.csv(file="/home/wonnetz/Documents/DataFest2019/Data/DATA2019 copy/data for datafest 2019/wellness.csv", header=TRUE, sep=",")
+games <- read.csv(file="/home/wonnetz/Documents/DataFest2019/Data/DATA2019 copy/data for datafest 2019/games.csv", header=TRUE, sep=",")
+
+summary(rpe)
+summary(wellness)
+summary(games)
+```
+
+```{r}
+data <- subset(rpe, PlayerID==15)
+data <- subset(data, Training=='Yes')
+plot(data$SessionType, data$Duration)
+
+```
+
+Dealing with RPE
+```{r}
+rpeN <- select(rpe, Date, PlayerID, SessionType, SessionLoad) %>%
+  arrange(PlayerID) %>%
+  na.omit()
+
+```
+
+
+This is trying to organize the Game data based on the day
+```{r}
+
+dataN <- select(games ,Date, GameID, Tournament, Outcome, TeamPoints, TeamPointsAllowed)
+dataN <- mutate(dataN, TeamPointsDiff = TeamPoints - TeamPointsAllowed) %>%
+  mutate(Outcome = fct_recode(Outcome,"1" = "W", "0" = "L"))
+
+dataN$Outcome <- as.numeric(dataN$Outcome)
+
+range <-max(dataN$Outcome) - min(dataN$Outcome)
+dataN$Outcome <- (dataN$Outcome-min(dataN$Outcome))/range
+
+#1 represents a Win and 0 represents a Loss
+
+NumDate <- count(dataN, Tournament)
+
+dataDate <- select(dataN, Date, Tournament, Outcome,TeamPoints, TeamPointsAllowed, TeamPointsDiff) %>%
+  group_by(Tournament) %>%
+  summarise(sumTeamPoints = sum(TeamPoints), sumEnemyTeamPoints = sum(TeamPointsAllowed),PointDiff = sum(TeamPoints) - sum(TeamPointsAllowed), avgOutcome = mean(Outcome) )
+
+dataDate <- full_join(NumDate, dataDate) 
+
+```
+
